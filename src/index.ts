@@ -1,7 +1,7 @@
 import { BrowserMultiFormatReader } from '@zxing/library';
 
 /**
- * 1. 内嵌网页 HTML（保留中文界面，不影响编译）
+ * 1. 内嵌网页 HTML（模板字符串替换为字符串拼接，解决编译错误）
  */
 const WEB_HTML = `
 <!DOCTYPE html>
@@ -315,15 +315,15 @@ const WEB_HTML = `
         });
 
         /**
-         * 生成 Google OTP 二维码
+         * 生成 Google OTP 二维码（模板字符串替换为字符串拼接）
          * @param {Object} otpData - { issuer, account, secret }
          */
         async function generateQrCode(otpData) {
             try {
                 // 构建标准 Google OTP URI（与原二维码内容一致）
                 const otpUri = new URL('otpauth://totp/');
-                // 路径格式：Issuer:Account（编码特殊字符）
-                const path = `${encodeURIComponent(otpData.issuer)}:${encodeURIComponent(otpData.account)}`;
+                // 路径格式：Issuer:Account（编码特殊字符）- 替换模板字符串为拼接
+                const path = encodeURIComponent(otpData.issuer) + ':' + encodeURIComponent(otpData.account);
                 otpUri.pathname = path;
                 // 添加查询参数
                 otpUri.searchParams.set('secret', otpData.secret);
@@ -375,8 +375,8 @@ const WEB_HTML = `
                 // 创建下载链接
                 const a = document.createElement('a');
                 a.href = qrUrl;
-                // 文件名格式：Google-OTP-账户名.png
-                const filename = `Google-OTP-${decodedResult.account || 'unknown'}.png`;
+                // 文件名格式：Google-OTP-账户名.png - 替换模板字符串为拼接
+                const filename = 'Google-OTP-' + (decodedResult.account || 'unknown') + '.png';
                 a.download = filename;
                 document.body.appendChild(a);
                 a.click();
@@ -400,20 +400,19 @@ const WEB_HTML = `
             downloadFile(jsonStr, 'otp-decode-result.json', 'application/json');
         });
 
-        // 下载TXT结果
+        // 下载TXT结果（模板字符串替换为字符串拼接）
         downloadTxtBtn.addEventListener('click', () => {
             if (!decodedResult) {
                 showToast('无解码结果可下载');
                 return;
             }
-            const txtStr = [
-                `Google OTP 解码结果`,
-                `-------------------`,
-                `发行方（Issuer）: ${decodedResult.issuer || '未知'}`,
-                `关联账户（Account）: ${decodedResult.account || '未知'}`,
-                `OTP 密钥（Secret）: ${decodedResult.secret || '未知'}`,
-                `二维码URI: otpauth://totp/${encodeURIComponent(decodedResult.issuer)}:${encodeURIComponent(decodedResult.account)}?secret=${decodedResult.secret}&issuer=${decodedResult.issuer}`
-            ].join('\n');
+            // 替换模板字符串为字符串拼接
+            const txtStr = 'Google OTP 解码结果\n' +
+                          '-------------------\n' +
+                          '发行方（Issuer）: ' + (decodedResult.issuer || '未知') + '\n' +
+                          '关联账户（Account）: ' + (decodedResult.account || '未知') + '\n' +
+                          'OTP 密钥（Secret）: ' + (decodedResult.secret || '未知') + '\n' +
+                          '二维码URI: otpauth://totp/' + encodeURIComponent(decodedResult.issuer) + ':' + encodeURIComponent(decodedResult.account) + '?secret=' + decodedResult.secret + '&issuer=' + decodedResult.issuer;
             downloadFile(txtStr, 'otp-decode-result.txt', 'text/plain');
         });
 
@@ -428,7 +427,7 @@ const WEB_HTML = `
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            showToast(`文件已下载：${filename}`);
+            showToast('文件已下载：' + filename);
         }
 
         // 降级复制方案（兼容旧浏览器）
@@ -475,7 +474,7 @@ const WEB_HTML = `
 `;
 
 /**
- * 2. 核心解码逻辑（所有中文错误信息替换为英文，解决TS编译错误）
+ * 2. 核心解码逻辑（无变更，保持稳定性）
  */
 function parseGoogleOTPUri(uri: string): {
   issuer: string;
@@ -561,7 +560,7 @@ async function decodeQrCode(imageData: Buffer | string): Promise<string> {
 }
 
 /**
- * 3. HTTP 服务入口（所有中文错误信息替换为英文）
+ * 3. HTTP 服务入口（无变更）
  */
 export default {
   async fetch(request: Request): Promise<Response> {
