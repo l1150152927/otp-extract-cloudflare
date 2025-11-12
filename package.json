@@ -9,12 +9,12 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@zxing/library": "^0.21.0" // 二维码解码库（与 decodeGoogleOTP 的 gozxing 功能对齐）
+    "@zxing/library": "^0.21.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250206.0",
-    "@types/node": "^20.11.0",
-    "typescript": "^5.3.3",
-    "wrangler": "^3.32.0"
+    "@cloudflare/workers-types": "^4.20251111.0",
+    "@types/node": "^20.19.25",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.47.0" // 升级到最新版，解决版本警告
   }
 }
