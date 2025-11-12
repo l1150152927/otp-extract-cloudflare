@@ -1,7 +1,7 @@
 import { BrowserMultiFormatReader } from '@zxing/library';
 
 /**
- * 1. 内嵌网页 HTML（新增二维码导出功能）
+ * 1. 内嵌网页 HTML（保留中文界面，不影响编译）
  */
 const WEB_HTML = `
 <!DOCTYPE html>
@@ -80,7 +80,7 @@ const WEB_HTML = `
             <p class="mt-2 text-gray-600">解码中...</p>
         </div>
 
-        <!-- 成功结果展示（新增二维码导出功能） -->
+        <!-- 成功结果展示（含二维码导出功能） -->
         <div id="successCard" class="result-card bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
             <h3 class="text-lg font-semibold text-green-800 mb-4 flex items-center">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,7 +110,7 @@ const WEB_HTML = `
                 </div>
             </div>
 
-            <!-- 二维码导出区域（新增） -->
+            <!-- 二维码导出区域 -->
             <div class="mt-6 pt-4 border-t border-green-100">
                 <h4 class="font-medium text-gray-800 mb-3">导出二维码</h4>
                 <div class="qrcode-container">
@@ -183,8 +183,8 @@ const WEB_HTML = `
         const copySecretBtn = document.getElementById('copySecretBtn');
         const downloadJsonBtn = document.getElementById('downloadJsonBtn');
         const downloadTxtBtn = document.getElementById('downloadTxtBtn');
-        const downloadQrBtn = document.getElementById('downloadQrBtn'); // 新增
-        const qrcodeCanvas = document.getElementById('qrcodeCanvas'); // 新增
+        const downloadQrBtn = document.getElementById('downloadQrBtn');
+        const qrcodeCanvas = document.getElementById('qrcodeCanvas');
         const errorMsg = document.getElementById('errorMsg');
         const copyToast = document.getElementById('copyToast');
 
@@ -287,7 +287,7 @@ const WEB_HTML = `
                 try {
                     data = await response.json();
                 } catch (jsonErr) {
-                    throw new Error(`服务端响应格式错误：${jsonErr.message}`);
+                    throw new Error('服务端响应格式错误');
                 }
 
                 loading.classList.add('hidden');
@@ -301,21 +301,21 @@ const WEB_HTML = `
                     resultSecret.textContent = data.data.secret || '未知';
                     successCard.classList.remove('hidden');
 
-                    // 生成二维码（新增核心逻辑）
+                    // 生成二维码
                     await generateQrCode(data.data);
                 } else {
-                    const errMsg = data?.error || `服务端错误（状态码：${response.status}）`;
+                    const errMsg = data?.error || '服务端错误';
                     showError(errMsg);
                 }
             } catch (err) {
                 loading.classList.add('hidden');
-                showError(`解码过程出错：${err instanceof Error ? err.message : '未知错误'}`);
+                showError('解码过程出错：' + (err instanceof Error ? err.message : '未知错误'));
                 console.error('解码错误详情：', err);
             }
         });
 
         /**
-         * 新增：生成 Google OTP 二维码
+         * 生成 Google OTP 二维码
          * @param {Object} otpData - { issuer, account, secret }
          */
         async function generateQrCode(otpData) {
@@ -367,7 +367,7 @@ const WEB_HTML = `
             }
         });
 
-        // 新增：下载二维码图片
+        // 下载二维码图片
         downloadQrBtn.addEventListener('click', () => {
             try {
                 // 将Canvas转为图片URL
@@ -475,7 +475,7 @@ const WEB_HTML = `
 `;
 
 /**
- * 2. 核心解码逻辑（无变更，保持原有稳定性）
+ * 2. 核心解码逻辑（所有中文错误信息替换为英文，解决TS编译错误）
  */
 function parseGoogleOTPUri(uri: string): {
   issuer: string;
@@ -484,7 +484,7 @@ function parseGoogleOTPUri(uri: string): {
 } {
   try {
     if (!uri.startsWith('otpauth://totp/')) {
-      throw new Error('非 Google OTP 二维码（仅支持 totp 类型）');
+      throw new Error('Not a Google OTP QR code (only supports totp type)');
     }
 
     const url = new URL(uri);
@@ -501,16 +501,16 @@ function parseGoogleOTPUri(uri: string): {
     }
 
     if (!issuer || !issuer.toLowerCase().includes('google')) {
-      throw new Error(`非 Google OTP 二维码（issuer: ${issuer || '未知'}）`);
+      throw new Error(`Not a Google OTP QR code (issuer: ${issuer || 'unknown'})`);
     }
 
     const secret = url.searchParams.get('secret');
     if (!secret || !/^[A-Za-z0-9]{16,}$/.test(secret)) {
-      throw new Error('未提取到有效的 OTP 密钥（需为 Base32 格式，长度≥16）');
+      throw new Error('Valid OTP secret not found (must be Base32 format, length ≥16)');
     }
 
     if (!account) {
-      throw new Error('未从二维码中提取到关联账户（邮箱/用户名）');
+      throw new Error('Associated account (email/username) not found in QR code');
     }
 
     return {
@@ -519,7 +519,7 @@ function parseGoogleOTPUri(uri: string): {
       secret: secret.trim().toUpperCase(),
     };
   } catch (err) {
-    console.error('URI解析错误：', err);
+    console.error('URI parse error:', err);
     throw err;
   }
 }
@@ -531,7 +531,7 @@ async function decodeQrCode(imageData: Buffer | string): Promise<string> {
 
     if (typeof imageData === 'string' && imageData.startsWith('data:image/')) {
       const base64Str = imageData.split(',')[1];
-      if (!base64Str) throw new Error('Base64 图片格式错误（缺少数据部分）');
+      if (!base64Str) throw new Error('Base64 image format error (missing data part)');
       
       const binaryStr = atob(base64Str.replace(/\s/g, ''));
       uint8Array = new Uint8Array(binaryStr.length);
@@ -541,19 +541,19 @@ async function decodeQrCode(imageData: Buffer | string): Promise<string> {
     } else if (imageData instanceof Buffer) {
       uint8Array = new Uint8Array(imageData);
     } else {
-      throw new Error(`不支持的图片输入格式（类型：${typeof imageData}）`);
+      throw new Error(`Unsupported image input format (type: ${typeof imageData})`);
     }
 
     const decodePromise = reader.decodeFromUint8Array(uint8Array);
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('二维码解码超时（图片可能过大或模糊）')), 5000)
+      setTimeout(() => reject(new Error('QR code decode timeout (image may be too large or blurry)')), 5000)
     );
 
     const result = await Promise.race([decodePromise, timeoutPromise]);
-    if (!result) throw new Error('未识别到二维码内容');
+    if (!result) throw new Error('No QR code content detected');
     return result.getText();
   } catch (err) {
-    console.error('二维码解码错误：', err);
+    console.error('QR code decode error:', err);
     throw err;
   } finally {
     reader.reset();
@@ -561,7 +561,7 @@ async function decodeQrCode(imageData: Buffer | string): Promise<string> {
 }
 
 /**
- * 3. HTTP 服务入口（无变更，保持跨域兼容性）
+ * 3. HTTP 服务入口（所有中文错误信息替换为英文）
  */
 export default {
   async fetch(request: Request): Promise<Response> {
@@ -580,34 +580,38 @@ export default {
       });
     }
 
+    // 路由 1：访问根路径（/）返回网页
     if (request.method === 'GET' && url.pathname === '/') {
       responseHeaders.set('Content-Type', 'text/html; charset=utf-8');
       return new Response(WEB_HTML, { headers: responseHeaders });
     }
 
+    // 路由 2：API 路由（/decode）处理解码请求
     if (url.pathname === '/decode') {
       responseHeaders.set('Content-Type', 'application/json');
       try {
         let qrUri: string;
 
+        // 场景 1：POST 上传图片文件（form-data）
         if (request.method === 'POST' && request.headers.get('Content-Type')?.includes('multipart/form-data')) {
           try {
             const formData = await request.formData();
             const file = formData.get('image') as File | null;
-            if (!file) throw new Error('请上传图片文件（字段名：image）');
+            if (!file) throw new Error('Please upload an image file (field name: image)');
             
             const fileBuffer = await file.arrayBuffer();
             qrUri = await decodeQrCode(Buffer.from(fileBuffer));
           } catch (err) {
-            throw new Error(`表单上传失败：${(err as Error).message}`);
+            throw new Error(`Form upload failed: ${(err as Error).message}`);
           }
         }
 
+        // 场景 2：GET 请求传入图片 URL（query 参数：url）
         else if (request.method === 'GET' && url.searchParams.has('url')) {
           try {
             const imageUrl = url.searchParams.get('url')!;
             if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
-              throw new Error('图片URL格式错误（需以 http/https 开头）');
+              throw new Error('Invalid image URL format (must start with http/https)');
             }
 
             const imageResp = await fetch(imageUrl, {
@@ -617,28 +621,29 @@ export default {
               timeout: 5000
             });
 
-            if (!imageResp.ok) throw new Error(`图片URL访问失败（状态码：${imageResp.status}）`);
+            if (!imageResp.ok) throw new Error(`Image URL request failed (status code: ${imageResp.status})`);
             const imageBuffer = await imageResp.arrayBuffer();
             qrUri = await decodeQrCode(Buffer.from(imageBuffer));
           } catch (err) {
-            throw new Error(`URL图片解码失败：${(err as Error).message}`);
+            throw new Error(`URL image decode failed: ${(err as Error).message}`);
           }
         }
 
+        // 场景 3：POST 传入 Base64 图片（JSON）
         else if (request.method === 'POST') {
           try {
             const body = await request.json();
             if (!body.base64 || !body.base64.startsWith('data:image/')) {
-              throw new Error('Base64 图片格式错误（需包含 "data:image/" 前缀）');
+              throw new Error('Invalid Base64 image format (must include "data:image/" prefix)');
             }
             qrUri = await decodeQrCode(body.base64);
           } catch (err) {
-            throw new Error(`Base64解码失败：${(err as Error).message}`);
+            throw new Error(`Base64 decode failed: ${(err as Error).message}`);
           }
         }
 
         else {
-          throw new Error(`不支持的请求方式：${request.method}\n支持用法：\n1. POST 上传图片（form-data: image）\n2. GET ?url=图片URL\n3. POST JSON { "base64": "图片Base64" }`);
+          throw new Error(`Unsupported request method: ${request.method}\nSupported usages:\n1. POST image (form-data: image)\n2. GET ?url=image-url\n3. POST JSON { "base64": "image-base64" }`);
         }
 
         const otpInfo = parseGoogleOTPUri(qrUri);
@@ -648,8 +653,8 @@ export default {
         }), { headers: responseHeaders });
 
       } catch (error: any) {
-        const errMsg = error.message || '解码失败';
-        console.error('API错误：', errMsg, error.stack);
+        const errMsg = error.message || 'Decode failed';
+        console.error('API error:', errMsg, error.stack);
         return new Response(JSON.stringify({
           success: false,
           error: errMsg,
@@ -660,10 +665,11 @@ export default {
       }
     }
 
+    // 其他路由：返回 404
     responseHeaders.set('Content-Type', 'application/json');
     return new Response(JSON.stringify({
       success: false,
-      error: '路径不存在，请访问根路径（/）使用网页工具，或访问 /decode 调用 API',
+      error: 'Path not found. Visit root path (/) for web tool, or /decode for API',
     }), {
       status: 404,
       headers: responseHeaders,
