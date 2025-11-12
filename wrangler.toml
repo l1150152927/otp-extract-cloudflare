@@ -7,12 +7,9 @@ main = "src/index.ts"
 # 兼容性日期（使用日志中检测到的最新日期）
 compatibility_date = "2025-11-11"
 
-# 启用 Node.js 兼容性模式
+# 启用 Node.js 兼容性模式（必须保留）
 compatibility_flags = ["nodejs_compat"]
 
-# 内存配置（直接放在顶级，适配 wrangler 4.x）
-memory = 256 # 单位 MB（免费额度最大）
-
-# 开发环境配置
+# 开发环境配置（本地调试用，不影响部署）
 [dev]
-port = 8787 # 本地调试端口
+port = 8787
