@@ -10,11 +10,9 @@ compatibility_date = "2025-11-11"
 # 启用 Node.js 兼容性模式
 compatibility_flags = ["nodejs_compat"]
 
-# 内存配置（移到 build.upload 下，适配 wrangler 4.x）
-[build.upload]
+# 内存配置（直接放在顶级，适配 wrangler 4.x）
 memory = 256 # 单位 MB（免费额度最大）
-# cpu_time 无需配置，默认值足够解码使用
 
-# 开发环境配置（移除不支持的 local 字段）
+# 开发环境配置
 [dev]
 port = 8787 # 本地调试端口
