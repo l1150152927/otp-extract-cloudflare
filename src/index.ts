@@ -1,7 +1,7 @@
 import { BrowserMultiFormatReader } from '@zxing/library';
 
 /**
- * 1. 内嵌网页 HTML（新增输出选项+报错优化）
+ * 1. 内嵌网页 HTML（新增二维码导出功能）
  */
 const WEB_HTML = `
 <!DOCTYPE html>
@@ -11,6 +11,8 @@ const WEB_HTML = `
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Google OTP 二维码解码工具</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入二维码生成库（CDN 轻量版） -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     <style>
         .upload-area {
             border: 2px dashed #d1d5db;
@@ -32,6 +34,17 @@ const WEB_HTML = `
         .download-btn-group {
             margin-top: 1rem;
             gap: 0.5rem;
+        }
+        .qrcode-container {
+            margin: 1rem 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .qrcode-preview {
+            border: 4px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
         }
     </style>
 </head>
@@ -67,7 +80,7 @@ const WEB_HTML = `
             <p class="mt-2 text-gray-600">解码中...</p>
         </div>
 
-        <!-- 成功结果展示（新增复制+下载功能） -->
+        <!-- 成功结果展示（新增二维码导出功能） -->
         <div id="successCard" class="result-card bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
             <h3 class="text-lg font-semibold text-green-800 mb-4 flex items-center">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -96,7 +109,25 @@ const WEB_HTML = `
                     </div>
                 </div>
             </div>
-            <!-- 下载按钮组 -->
+
+            <!-- 二维码导出区域（新增） -->
+            <div class="mt-6 pt-4 border-t border-green-100">
+                <h4 class="font-medium text-gray-800 mb-3">导出二维码</h4>
+                <div class="qrcode-container">
+                    <!-- 二维码预览 -->
+                    <canvas id="qrcodeCanvas" class="qrcode-preview w-48 h-48 md:w-64 md:h-64"></canvas>
+                    <p class="text-xs text-gray-500 mt-2">扫码即可绑定 OTP 客户端</p>
+                </div>
+                <!-- 二维码下载按钮 -->
+                <button id="downloadQrBtn" class="mt-3 bg-blue-50 text-blue-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors">
+                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    下载二维码图片
+                </button>
+            </div>
+
+            <!-- 原有下载按钮组 -->
             <div class="download-btn-group flex flex-wrap mt-4">
                 <button id="downloadJsonBtn" class="bg-gray-100 text-gray-800 py-2 px-4 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
                     <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,7 +144,7 @@ const WEB_HTML = `
             </div>
         </div>
 
-        <!-- 错误结果展示（优化报错信息） -->
+        <!-- 错误结果展示 -->
         <div id="errorCard" class="result-card bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
             <h3 class="text-lg font-semibold text-red-800 mb-2 flex items-center">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -130,9 +161,9 @@ const WEB_HTML = `
         <p>功能与 <a href="https://github.com/Kuingsmile/decodeGoogleOTP" target="_blank" class="text-blue-500 hover:underline">decodeGoogleOTP</a> 完全一致 | 基于 Cloudflare Workers 构建</p>
     </footer>
 
-    <!-- 复制成功提示 -->
+    <!-- 复制/操作成功提示 -->
     <div id="copyToast" class="fixed bottom-4 right-4 bg-gray-800 text-white py-2 px-4 rounded-lg text-sm hidden">
-        复制成功！
+        操作成功！
     </div>
 
     <script>
@@ -152,10 +183,12 @@ const WEB_HTML = `
         const copySecretBtn = document.getElementById('copySecretBtn');
         const downloadJsonBtn = document.getElementById('downloadJsonBtn');
         const downloadTxtBtn = document.getElementById('downloadTxtBtn');
+        const downloadQrBtn = document.getElementById('downloadQrBtn'); // 新增
+        const qrcodeCanvas = document.getElementById('qrcodeCanvas'); // 新增
         const errorMsg = document.getElementById('errorMsg');
         const copyToast = document.getElementById('copyToast');
 
-        // 存储解码结果（用于下载）
+        // 存储解码结果（用于下载/生成二维码）
         let decodedResult = null;
 
         // 上传区域点击触发文件选择
@@ -189,6 +222,9 @@ const WEB_HTML = `
             hideAllResults();
             fileInput.value = '';
             decodedResult = null;
+            // 清空二维码
+            const ctx = qrcodeCanvas.getContext('2d');
+            ctx.clearRect(0, 0, qrcodeCanvas.width, qrcodeCanvas.height);
         });
 
         // 处理文件（预览+显示解码按钮）
@@ -220,7 +256,7 @@ const WEB_HTML = `
             reader.readAsDataURL(file);
         }
 
-        // 解码按钮点击事件（优化API调用逻辑）
+        // 解码按钮点击事件
         decodeBtn.addEventListener('click', async () => {
             const imageSrc = previewImage.src;
             if (!imageSrc) return;
@@ -231,11 +267,11 @@ const WEB_HTML = `
             hideAllResults();
 
             try {
-                // 优化：处理大图片Base64可能导致的问题
+                // 处理大图片Base64可能导致的问题
                 const base64Str = imageSrc.split(',')[1];
                 if (!base64Str) throw new Error('图片Base64编码失败');
 
-                // 调用后端API（使用相对路径，避免跨域问题）
+                // 调用后端API
                 const response = await fetch('/decode', {
                     method: 'POST',
                     headers: { 
@@ -243,10 +279,10 @@ const WEB_HTML = `
                         'Accept': 'application/json'
                     },
                     body: JSON.stringify({ base64: imageSrc }),
-                    credentials: 'same-origin' // 避免跨域凭证问题
+                    credentials: 'same-origin'
                 });
 
-                // 解析响应（兼容非JSON响应）
+                // 解析响应
                 let data;
                 try {
                     data = await response.json();
@@ -257,25 +293,62 @@ const WEB_HTML = `
                 loading.classList.add('hidden');
 
                 if (response.ok && data.success) {
-                    // 存储结果用于下载
+                    // 存储结果
                     decodedResult = data.data;
                     // 显示成功结果
                     resultIssuer.textContent = data.data.issuer || '未知';
                     resultAccount.textContent = data.data.account || '未知';
                     resultSecret.textContent = data.data.secret || '未知';
                     successCard.classList.remove('hidden');
+
+                    // 生成二维码（新增核心逻辑）
+                    await generateQrCode(data.data);
                 } else {
-                    // 显示错误信息（优先取服务端错误，否则取HTTP状态）
                     const errMsg = data?.error || `服务端错误（状态码：${response.status}）`;
                     showError(errMsg);
                 }
             } catch (err) {
                 loading.classList.add('hidden');
-                // 前端错误详细提示
                 showError(`解码过程出错：${err instanceof Error ? err.message : '未知错误'}`);
                 console.error('解码错误详情：', err);
             }
         });
+
+        /**
+         * 新增：生成 Google OTP 二维码
+         * @param {Object} otpData - { issuer, account, secret }
+         */
+        async function generateQrCode(otpData) {
+            try {
+                // 构建标准 Google OTP URI（与原二维码内容一致）
+                const otpUri = new URL('otpauth://totp/');
+                // 路径格式：Issuer:Account（编码特殊字符）
+                const path = `${encodeURIComponent(otpData.issuer)}:${encodeURIComponent(otpData.account)}`;
+                otpUri.pathname = path;
+                // 添加查询参数
+                otpUri.searchParams.set('secret', otpData.secret);
+                otpUri.searchParams.set('issuer', otpData.issuer);
+                otpUri.searchParams.set('algorithm', 'SHA1'); // Google OTP 默认算法
+                otpUri.searchParams.set('digits', '6'); // Google OTP 默认位数
+                otpUri.searchParams.set('period', '30'); // Google OTP 默认周期
+
+                // 生成二维码（Canvas 渲染）
+                await QRCode.toCanvas(qrcodeCanvas, otpUri.toString(), {
+                    width: 256, // 二维码尺寸
+                    margin: 1, // 边距
+                    color: {
+                        dark: '#000000', // 深色模块颜色
+                        light: '#ffffff' // 浅色背景颜色
+                    }
+                });
+            } catch (err) {
+                console.error('二维码生成失败：', err);
+                showToast('二维码生成失败，请刷新页面重试');
+                // 清空Canvas
+                const ctx = qrcodeCanvas.getContext('2d');
+                ctx.clearRect(0, 0, qrcodeCanvas.width, qrcodeCanvas.height);
+            }
+        }
 
         // 复制密钥功能
         copySecretBtn.addEventListener('click', () => {
@@ -285,7 +358,6 @@ const WEB_HTML = `
                 return;
             }
 
-            // 优化复制逻辑，兼容不同浏览器
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(secret)
                     .then(() => showToast('密钥复制成功！'))
@@ -295,23 +367,28 @@ const WEB_HTML = `
             }
         });
 
-        // 降级复制方案（兼容旧浏览器）
-        function copyWithFallback(text) {
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            textarea.style.position = 'fixed';
-            document.body.appendChild(textarea);
-            textarea.select();
+        // 新增：下载二维码图片
+        downloadQrBtn.addEventListener('click', () => {
             try {
-                document.execCommand('copy');
-                showToast('密钥复制成功！');
+                // 将Canvas转为图片URL
+                const qrUrl = qrcodeCanvas.toDataURL('image/png');
+                // 创建下载链接
+                const a = document.createElement('a');
+                a.href = qrUrl;
+                // 文件名格式：Google-OTP-账户名.png
+                const filename = `Google-OTP-${decodedResult.account || 'unknown'}.png`;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                // 释放URL资源
+                URL.revokeObjectURL(qrUrl);
+                showToast('二维码下载成功！');
             } catch (err) {
-                showToast('复制失败，请手动复制');
-                console.error('复制失败：', err);
-            } finally {
-                document.body.removeChild(textarea);
+                console.error('二维码下载失败：', err);
+                showToast('二维码下载失败，请重试');
             }
-        }
+        });
 
         // 下载JSON结果
         downloadJsonBtn.addEventListener('click', () => {
@@ -334,7 +411,8 @@ const WEB_HTML = `
                 `-------------------`,
                 `发行方（Issuer）: ${decodedResult.issuer || '未知'}`,
                 `关联账户（Account）: ${decodedResult.account || '未知'}`,
-                `OTP 密钥（Secret）: ${decodedResult.secret || '未知'}`
+                `OTP 密钥（Secret）: ${decodedResult.secret || '未知'}`,
+                `二维码URI: otpauth://totp/${encodeURIComponent(decodedResult.issuer)}:${encodeURIComponent(decodedResult.account)}?secret=${decodedResult.secret}&issuer=${decodedResult.issuer}`
             ].join('\n');
             downloadFile(txtStr, 'otp-decode-result.txt', 'text/plain');
         });
@@ -351,6 +429,24 @@ const WEB_HTML = `
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             showToast(`文件已下载：${filename}`);
+        }
+
+        // 降级复制方案（兼容旧浏览器）
+        function copyWithFallback(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast('密钥复制成功！');
+            } catch (err) {
+                showToast('复制失败，请手动复制');
+                console.error('复制失败：', err);
+            } finally {
+                document.body.removeChild(textarea);
+            }
         }
 
         // 提示工具函数
@@ -379,7 +475,7 @@ const WEB_HTML = `
 `;
 
 /**
- * 2. 核心解码逻辑（优化错误处理+日志输出）
+ * 2. 核心解码逻辑（无变更，保持原有稳定性）
  */
 function parseGoogleOTPUri(uri: string): {
   issuer: string;
@@ -423,7 +519,6 @@ function parseGoogleOTPUri(uri: string): {
       secret: secret.trim().toUpperCase(),
     };
   } catch (err) {
-    // 增加错误日志，方便排查
     console.error('URI解析错误：', err);
     throw err;
   }
@@ -438,8 +533,7 @@ async function decodeQrCode(imageData: Buffer | string): Promise<string> {
       const base64Str = imageData.split(',')[1];
       if (!base64Str) throw new Error('Base64 图片格式错误（缺少数据部分）');
       
-      // 优化Base64解码兼容性
-      const binaryStr = atob(base64Str.replace(/\s/g, '')); // 去除空格
+      const binaryStr = atob(base64Str.replace(/\s/g, ''));
       uint8Array = new Uint8Array(binaryStr.length);
       for (let i = 0; i < binaryStr.length; i++) {
         uint8Array[i] = binaryStr.charCodeAt(i);
@@ -450,7 +544,6 @@ async function decodeQrCode(imageData: Buffer | string): Promise<string> {
       throw new Error(`不支持的图片输入格式（类型：${typeof imageData}）`);
     }
 
-    // 增加解码超时处理（5秒）
     const decodePromise = reader.decodeFromUint8Array(uint8Array);
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('二维码解码超时（图片可能过大或模糊）')), 5000)
@@ -468,7 +561,7 @@ async function decodeQrCode(imageData: Buffer | string): Promise<string> {
 }
 
 /**
- * 3. HTTP 服务入口（优化跨域+错误处理）
+ * 3. HTTP 服务入口（无变更，保持跨域兼容性）
  */
 export default {
   async fetch(request: Request): Promise<Response> {
@@ -477,10 +570,9 @@ export default {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Accept',
-      'Access-Control-Max-Age': '86400', // 跨域缓存1天
+      'Access-Control-Max-Age': '86400',
     });
 
-    // 处理 OPTIONS 预检请求（优化跨域配置）
     if (request.method === 'OPTIONS') {
       return new Response(null, { 
         headers: responseHeaders,
@@ -488,21 +580,16 @@ export default {
       });
     }
 
-    // 路由 1：访问根路径（/）返回网页
     if (request.method === 'GET' && url.pathname === '/') {
-      responseHeaders.set('Content-Type', 'text/html; charset=utf-8');
-      responseHeaders.delete('Content-Type'); // 清除JSON类型
       responseHeaders.set('Content-Type', 'text/html; charset=utf-8');
       return new Response(WEB_HTML, { headers: responseHeaders });
     }
 
-    // 路由 2：API 路由（/decode）处理解码请求
     if (url.pathname === '/decode') {
       responseHeaders.set('Content-Type', 'application/json');
       try {
         let qrUri: string;
 
-        // 场景 1：POST 上传图片文件（form-data）
         if (request.method === 'POST' && request.headers.get('Content-Type')?.includes('multipart/form-data')) {
           try {
             const formData = await request.formData();
@@ -516,11 +603,9 @@ export default {
           }
         }
 
-        // 场景 2：GET 请求传入图片 URL（query 参数：url）
         else if (request.method === 'GET' && url.searchParams.has('url')) {
           try {
             const imageUrl = url.searchParams.get('url')!;
-            // 校验URL格式
             if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
               throw new Error('图片URL格式错误（需以 http/https 开头）');
             }
@@ -528,8 +613,8 @@ export default {
             const imageResp = await fetch(imageUrl, {
               headers: { 'User-Agent': 'Mozilla/5.0 (Cloudflare Workers)' },
               cf: { cacheTtl: 300 },
-              redirect: 'follow', // 跟随重定向
-              timeout: 5000 // 5秒超时
+              redirect: 'follow',
+              timeout: 5000
             });
 
             if (!imageResp.ok) throw new Error(`图片URL访问失败（状态码：${imageResp.status}）`);
@@ -540,7 +625,6 @@ export default {
           }
         }
 
-        // 场景 3：POST 传入 Base64 图片（JSON）
         else if (request.method === 'POST') {
           try {
             const body = await request.json();
@@ -576,7 +660,6 @@ export default {
       }
     }
 
-    // 其他路由：返回 404
     responseHeaders.set('Content-Type', 'application/json');
     return new Response(JSON.stringify({
       success: false,
