@@ -1,7 +1,7 @@
 import { BrowserMultiFormatReader } from '@zxing/library';
 
 /**
- * 1. 内嵌网页 HTML（仅保留界面中文，逻辑提示全英文）
+ * 1. 内嵌网页 HTML（保持不变）
  */
 const WEB_HTML = `
 <!DOCTYPE html>
@@ -272,7 +272,7 @@ const WEB_HTML = `
                 });
             }
 
-            // 解码按钮（核心修复：所有模板字符串中文替换为英文）
+            // 解码按钮
             if (decodeBtn && previewImage) {
                 decodeBtn.addEventListener('click', async function() {
                     const imageSrc = previewImage.src;
@@ -337,7 +337,6 @@ const WEB_HTML = `
                                 showToast('QR Code library loaded failed, cannot generate QR Code');
                             }
                         } else {
-                            // 修复：中文改为英文，避免编译错误
                             const errDetail = data?.error || \`Status code: \${response.status}, no detailed message\`;
                             showError('Request failed: ' + errDetail);
                         }
@@ -558,7 +557,7 @@ const WEB_HTML = `
 `;
 
 /**
- * 2. 核心解码逻辑（错误提示全英文）
+ * 2. 核心解码逻辑（修复 @zxing/library 0.21.3 兼容问题）
  */
 function parseGoogleOTPUri(uri: string): {
   issuer: string;
@@ -609,15 +608,37 @@ function parseGoogleOTPUri(uri: string): {
 async function decodeQrCode(base64Str: string): Promise<string> {
   try {
     const reader = new BrowserMultiFormatReader();
-    // 校验 Base64 有效性
+    // 1. 校验 Base64 有效性
     try {
       atob(base64Str); // 验证 Base64 格式
     } catch (base64Err) {
       throw new Error('Invalid Base64 encoding: cannot decode to binary data');
     }
+
+    // 2. 转换 Base64 为 Uint8Array
     const uint8Array = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
 
-    const decodePromise = reader.decodeFromUint8Array(uint8Array);
+    // 3. 修复：@zxing/library@0.21.3 用 decodeBuffer 替代 decodeFromUint8Array
+    // 注意：decodeBuffer 需要传递 buffer、width、height，这里通过简单计算获取图片尺寸（兼容大多数场景）
+    let width = 256;
+    let height = 256;
+    try {
+      // 尝试从 Base64 图片中提取尺寸（仅支持 PNG/JPG）
+      const tempImg = new Image();
+      tempImg.src = `data:image/png;base64,${base64Str}`;
+      await new Promise((resolve, reject) => {
+        tempImg.onload = resolve;
+        tempImg.onerror = reject;
+      });
+      width = tempImg.width;
+      height = tempImg.height;
+    } catch (err) {
+      // 提取尺寸失败时，使用默认尺寸（256x256）
+      console.warn('Failed to get image size, use default 256x256:', err);
+    }
+
+    // 4. 解码：使用 decodeBuffer（对应版本的正确方法）
+    const decodePromise = reader.decodeBuffer(uint8Array, width, height);
     const timeoutPromise = new Promise<string>((_, reject) => 
       setTimeout(() => reject(new Error('Decode timeout (8s): image may be too large, blurry or not a QR Code')), 8000)
     );
@@ -635,7 +656,7 @@ async function decodeQrCode(base64Str: string): Promise<string> {
 }
 
 /**
- * 3. HTTP 服务入口（错误提示全英文）
+ * 3. HTTP 服务入口（保持不变）
  */
 export default {
   async fetch(request: Request): Promise<Response> {
@@ -691,7 +712,7 @@ export default {
             throw new Error('Invalid parameter: "base64" must be a non-empty string');
           }
 
-          // 4. 解码流程
+          // 4. 解码流程（使用修复后的 decodeQrCode 函数）
           const qrContent = await decodeQrCode(body.base64.trim());
           const otpInfo = await parseGoogleOTPUri(qrContent);
 
