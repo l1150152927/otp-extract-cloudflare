@@ -1,7 +1,7 @@
 import { BrowserMultiFormatReader } from '@zxing/library';
 
 /**
- * 1. 内嵌网页 HTML（修复请求体格式+加强错误处理）
+ * 1. 内嵌网页 HTML（中文保留，仅 JS 错误提示改为英文）
  */
 const WEB_HTML = `
 <!DOCTYPE html>
@@ -253,7 +253,7 @@ const WEB_HTML = `
                 });
             }
 
-            // 解码按钮（核心修复：请求体格式化+错误捕获）
+            // 解码按钮（核心修复：所有 JS 错误提示改为英文）
             if (decodeBtn && previewImage) {
                 decodeBtn.addEventListener('click', async function() {
                     const imageSrc = previewImage.src;
@@ -265,14 +265,14 @@ const WEB_HTML = `
                     hideAllResults();
 
                     try {
-                        // 修复1：处理 Base64 字符串（去除换行/空格，避免无效字符）
+                        // 处理 Base64 字符串（去除换行/空格）
                         const base64Parts = imageSrc.split(',');
-                        if (base64Parts.length < 2) throw new Error('图片Base64编码失败：格式不完整');
-                        let base64Str = base64Parts[1].replace(/\\s/g, ''); // 移除所有空白字符
+                        if (base64Parts.length < 2) throw new Error('Base64 encoding failed: incomplete format');
+                        let base64Str = base64Parts[1].replace(/\\s/g, '');
 
-                        // 修复2：构造标准请求体（仅传 Base64 数据，不含前缀）
+                        // 构造请求体
                         const requestBody = JSON.stringify({
-                            base64: base64Str // 后端直接接收处理后的 Base64
+                            base64: base64Str
                         });
 
                         // 发送请求
@@ -286,14 +286,13 @@ const WEB_HTML = `
                             credentials: 'same-origin'
                         });
 
-                        // 修复3：加强响应解析（处理 JSON 解析失败的情况）
+                        // 解析响应
                         let data;
                         try {
                             data = await response.json();
                         } catch (jsonErr) {
-                            // 解析 JSON 失败，读取响应文本
-                            const errText = await response.text().catch(() => '未知错误');
-                            throw new Error('服务端响应格式错误：' + errText);
+                            const errText = await response.text().catch(() => 'Unknown error');
+                            throw new Error('Server response format error: ' + errText);
                         }
 
                         // 隐藏加载状态
@@ -302,27 +301,27 @@ const WEB_HTML = `
                         if (response.ok && data.success) {
                             decodedResult = data.data;
                             // 显示结果
-                            if (resultIssuer) resultIssuer.textContent = data.data.issuer || '未知';
-                            if (resultAccount) resultAccount.textContent = data.data.account || '未知';
-                            if (resultSecret) resultSecret.textContent = data.data.secret || '未知';
+                            if (resultIssuer) resultIssuer.textContent = data.data.issuer || 'Unknown';
+                            if (resultAccount) resultAccount.textContent = data.data.account || 'Unknown';
+                            if (resultSecret) resultSecret.textContent = data.data.secret || 'Unknown';
                             if (successCard) successCard.classList.remove('hidden');
 
                             // 生成二维码
                             if (qrCodeLoaded) {
                                 await generateQrCode(data.data);
                             } else {
-                                showToast('二维码库加载失败，无法生成二维码');
+                                showToast('QR Code library loaded failed, cannot generate QR Code');
                             }
                         } else {
-                            // 修复4：显示具体错误信息（后端返回的 error 或响应状态）
-                            const errText = data?.error || `请求失败（状态码：${response.status}）`;
-                            showError('解码失败：' + errText);
+                            // 修复：中文改为英文，避免编译错误
+                            const errText = data?.error || \`Request failed (status code: \${response.status})\`;
+                            showError('Decode failed: ' + errText);
                         }
                     } catch (err) {
                         if (loading) loading.classList.add('hidden');
-                        const errText = err instanceof Error ? err.message : '未知错误';
-                        showError('解码过程出错：' + errText);
-                        console.error('解码错误详情：', err);
+                        const errText = err instanceof Error ? err.message : 'Unknown error';
+                        showError('Decode process error: ' + errText);
+                        console.error('Decode error details: ', err);
                     }
                 });
             }
@@ -332,14 +331,14 @@ const WEB_HTML = `
                 copySecretBtn.addEventListener('click', function() {
                     const secret = resultSecret.textContent || '';
                     if (!secret) {
-                        showToast('无密钥可复制');
+                        showToast('No secret to copy');
                         return;
                     }
 
                     if (navigator.clipboard && window.isSecureContext) {
                         navigator.clipboard.writeText(secret)
                             .then(function() {
-                                showToast('密钥复制成功！');
+                                showToast('Secret copied successfully!');
                             })
                             .catch(function() {
                                 copyWithFallback(secret);
@@ -354,7 +353,7 @@ const WEB_HTML = `
             if (downloadQrBtn && qrcodeCanvas) {
                 downloadQrBtn.addEventListener('click', function() {
                     if (!decodedResult || !qrCodeLoaded) {
-                        showToast('无解码结果或二维码库未加载');
+                        showToast('No decode result or QR Code library not loaded');
                         return;
                     }
 
@@ -370,10 +369,10 @@ const WEB_HTML = `
                         a.click();
                         document.body.removeChild(a);
                         URL.revokeObjectURL(qrUrl);
-                        showToast('二维码下载成功！');
+                        showToast('QR Code downloaded successfully!');
                     } catch (err) {
-                        showToast('二维码下载失败，请重试');
-                        console.error('二维码下载失败：', err);
+                        showToast('Failed to download QR Code, please try again');
+                        console.error('QR Code download failed: ', err);
                     }
                 });
             }
@@ -382,7 +381,7 @@ const WEB_HTML = `
             if (downloadJsonBtn) {
                 downloadJsonBtn.addEventListener('click', function() {
                     if (!decodedResult) {
-                        showToast('无解码结果可下载');
+                        showToast('No decode result to download');
                         return;
                     }
                     const jsonStr = JSON.stringify(decodedResult, null, 2);
@@ -394,25 +393,25 @@ const WEB_HTML = `
             if (downloadTxtBtn) {
                 downloadTxtBtn.addEventListener('click', function() {
                     if (!decodedResult) {
-                        showToast('无解码结果可下载');
+                        showToast('No decode result to download');
                         return;
                     }
 
-                    let txtStr = 'Google OTP 解码结果\\n';
+                    let txtStr = 'Google OTP Decode Result\\n';
                     txtStr += '-------------------\\n';
-                    txtStr += '发行方（Issuer）: ';
-                    txtStr += decodedResult.issuer ? decodedResult.issuer : '未知';
+                    txtStr += 'Issuer: ';
+                    txtStr += decodedResult.issuer ? decodedResult.issuer : 'Unknown';
                     txtStr += '\\n';
-                    txtStr += '关联账户（Account）: ';
-                    txtStr += decodedResult.account ? decodedResult.account : '未知';
+                    txtStr += 'Account: ';
+                    txtStr += decodedResult.account ? decodedResult.account : 'Unknown';
                     txtStr += '\\n';
-                    txtStr += 'OTP 密钥（Secret）: ';
-                    txtStr += decodedResult.secret ? decodedResult.secret : '未知';
+                    txtStr += 'OTP Secret: ';
+                    txtStr += decodedResult.secret ? decodedResult.secret : 'Unknown';
                     txtStr += '\\n';
                     const issuerEnc = encodeURIComponent(decodedResult.issuer || '');
                     const accountEnc = encodeURIComponent(decodedResult.account || '');
                     const secret = decodedResult.secret || '';
-                    txtStr += '二维码URI: otpauth://totp/';
+                    txtStr += 'QR Code URI: otpauth://totp/';
                     txtStr += issuerEnc;
                     txtStr += ':';
                     txtStr += accountEnc;
@@ -428,13 +427,13 @@ const WEB_HTML = `
             // 处理文件预览
             function handleFile(file) {
                 if (file.size > 5 * 1024 * 1024) {
-                    showError('图片过大，请上传≤5MB的图片');
+                    showError('Image too large: please upload files ≤5MB');
                     return;
                 }
 
                 const allowedTypes = ['image/png', 'image/jpeg', 'image/gif'];
                 if (!allowedTypes.includes(file.type)) {
-                    showError('不支持的文件格式，请上传 PNG/JPG/JPEG/GIF 图片');
+                    showError('Unsupported file format: only PNG/JPG/JPEG/GIF are allowed');
                     return;
                 }
 
@@ -446,7 +445,7 @@ const WEB_HTML = `
                     hideAllResults();
                 };
                 reader.onerror = function() {
-                    showError('图片读取失败，请重新选择图片');
+                    showError('Failed to read image: please select another image');
                 };
                 reader.readAsDataURL(file);
             }
@@ -471,8 +470,8 @@ const WEB_HTML = `
                         color: { dark: '#000000', light: '#ffffff' }
                     });
                 } catch (err) {
-                    showToast('二维码生成失败，请重试');
-                    console.error('二维码生成失败：', err);
+                    showToast('Failed to generate QR Code, please try again');
+                    console.error('QR Code generation failed: ', err);
                     if (qrcodeCanvas) {
                         const ctx = qrcodeCanvas.getContext('2d');
                         ctx.clearRect(0, 0, qrcodeCanvas.width, qrcodeCanvas.height);
@@ -492,10 +491,10 @@ const WEB_HTML = `
                     a.click();
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
-                    showToast('文件已下载：' + filename);
+                    showToast('File downloaded successfully: ' + filename);
                 } catch (err) {
-                    showToast('文件下载失败，请重试');
-                    console.error('文件下载失败：', err);
+                    showToast('Failed to download file, please try again');
+                    console.error('File download failed: ', err);
                 }
             }
 
@@ -509,10 +508,10 @@ const WEB_HTML = `
                 textarea.select();
                 try {
                     document.execCommand('copy');
-                    showToast('密钥复制成功！');
+                    showToast('Secret copied successfully!');
                 } catch (err) {
-                    showToast('复制失败，请手动复制');
-                    console.error('复制失败：', err);
+                    showToast('Failed to copy, please copy manually');
+                    console.error('Copy failed: ', err);
                 } finally {
                     document.body.removeChild(textarea);
                 }
@@ -543,7 +542,7 @@ const WEB_HTML = `
 
             // 初始化检查
             if (!qrCodeLoaded) {
-                console.warn('QRCode 库加载失败，二维码功能不可用');
+                console.warn('QR Code library loaded failed, QR Code function unavailable');
             }
         });
     </script>
@@ -552,7 +551,7 @@ const WEB_HTML = `
 `;
 
 /**
- * 2. 核心解码逻辑（修复：适配前端传递的 Base64 格式+明确错误信息）
+ * 2. 核心解码逻辑（错误提示全部改为英文）
  */
 function parseGoogleOTPUri(uri: string): {
   issuer: string;
@@ -561,7 +560,7 @@ function parseGoogleOTPUri(uri: string): {
 } {
   try {
     if (!uri.startsWith('otpauth://totp/')) {
-      throw new Error('不是 OTP 二维码：仅支持 TOTP 类型');
+      throw new Error('Not an OTP QR Code: only TOTP type is supported');
     }
 
     const url = new URL(uri);
@@ -569,7 +568,7 @@ function parseGoogleOTPUri(uri: string): {
     let issuer = url.searchParams.get('issuer') || '';
     let account = '';
 
-    // 解析账户和发行方（兼容两种格式：path=issuer:account 或 path=account&issuer=xxx）
+    // 解析账户和发行方
     if (path.includes(':')) {
       const [pathIssuer, ...accountParts] = path.split(':');
       account = accountParts.join(':').trim();
@@ -578,22 +577,21 @@ function parseGoogleOTPUri(uri: string): {
       account = path.trim();
     }
 
-    // 宽松校验：允许非 Google 发行方（仅提示，不拒绝）
+    // 宽松校验：允许非 Google 发行方
     if (!issuer || !issuer.toLowerCase().includes('google')) {
-      console.warn('非 Google OTP 二维码，仍尝试解码');
-      // 不再抛出错误，仅警告，支持更多 OTP 类型
+      console.warn('Not a Google OTP QR Code, still trying to decode');
     }
 
     const secret = url.searchParams.get('secret') || '';
     if (!secret) {
-      throw new Error('二维码中未找到 OTP 密钥');
+      throw new Error('OTP secret not found in QR Code');
     }
-    if (!/^[A-Za-z0-9+/=]{16,}$/.test(secret)) { // 放宽 Base32 校验，支持 URL 安全编码
-      throw new Error('OTP 密钥格式无效：应为 Base32 编码字符串');
+    if (!/^[A-Za-z0-9+/=]{16,}$/.test(secret)) {
+      throw new Error('Invalid OTP secret format: should be a Base32 encoded string');
     }
 
     if (!account) {
-      throw new Error('二维码中未找到关联账户');
+      throw new Error('Associated account not found in QR Code');
     }
 
     return {
@@ -602,7 +600,7 @@ function parseGoogleOTPUri(uri: string): {
       secret: secret.trim().toUpperCase(),
     };
   } catch (err) {
-    console.error('URI 解析错误:', err);
+    console.error('URI parsing error:', err);
     throw err;
   }
 }
@@ -610,28 +608,27 @@ function parseGoogleOTPUri(uri: string): {
 async function decodeQrCode(base64Str: string): Promise<string> {
   try {
     const reader = new BrowserMultiFormatReader();
-    // 修复：直接接收前端处理后的 Base64 字符串（无前缀）
     const uint8Array = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
 
     const decodePromise = reader.decodeFromUint8Array(uint8Array);
     const timeoutPromise = new Promise<string>((_, reject) => 
-      setTimeout(() => reject(new Error('二维码解码超时：图片可能过大或模糊')), 8000) // 延长超时时间
+      setTimeout(() => reject(new Error('QR Code decode timeout: image may be too large or blurry')), 8000)
     );
 
     const result = await Promise.race([decodePromise, timeoutPromise]);
     if (!result || !result.getText()) {
-      throw new Error('未识别到二维码内容：图片可能不是二维码或已损坏');
+      throw new Error('No QR Code content detected: image may not be a QR Code or is corrupted');
     }
 
     return result.getText();
   } catch (err) {
-    console.error('二维码解码错误:', err);
+    console.error('QR Code decoding error:', err);
     throw err;
   }
 }
 
 /**
- * 3. HTTP 服务入口（修复：明确请求参数解析+错误响应格式）
+ * 3. HTTP 服务入口（错误提示全部改为英文）
  */
 export default {
   async fetch(request: Request): Promise<Response> {
@@ -641,7 +638,7 @@ export default {
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Accept',
       'Access-Control-Max-Age': '86400',
-      'Content-Type': 'application/json', // 确保所有响应都是 JSON 格式
+      'Content-Type': 'application/json',
     });
 
     // 处理 OPTIONS 预检请求
@@ -661,13 +658,13 @@ export default {
     // 解码接口（POST /decode）
     if (request.method === 'POST' && url.pathname === '/decode') {
       try {
-        // 修复：解析请求体，确保获取到 base64 参数
+        // 解析请求体
         const body = await request.json().catch(() => {
-          throw new Error('请求体格式错误：应为 JSON 格式，包含 base64 字段');
+          throw new Error('Invalid request body format: should be JSON with "base64" field');
         });
 
         if (!body.base64 || typeof body.base64 !== 'string') {
-          throw new Error('缺少有效参数：base64 应为非空字符串');
+          throw new Error('Missing valid parameter: "base64" should be a non-empty string');
         }
 
         // 解码流程
@@ -681,9 +678,9 @@ export default {
         }), { headers: responseHeaders, status: 200 });
 
       } catch (error: any) {
-        // 错误响应：确保返回统一格式的 error 字段
-        const errMsg = error.message || '解码失败：未知错误';
-        console.error('服务端错误:', errMsg);
+        // 错误响应
+        const errMsg = error.message || 'Decode failed: unknown error';
+        console.error('Server error:', errMsg);
         return new Response(JSON.stringify({
           success: false,
           error: errMsg
@@ -694,7 +691,7 @@ export default {
     // 404 路由
     return new Response(JSON.stringify({
       success: false,
-      error: '路径不存在：仅支持 / 和 /decode 接口'
+      error: 'Path not found: only "/" and "/decode" endpoints are supported'
     }), { headers: responseHeaders, status: 404 });
   },
 };
