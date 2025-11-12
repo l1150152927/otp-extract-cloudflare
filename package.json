@@ -15,6 +15,7 @@
     "@cloudflare/workers-types": "^4.20251111.0",
     "@types/node": "^20.19.25",
     "typescript": "^5.9.3",
-    "wrangler": "^4.47.0" // 升级到最新版，解决版本警告
+    "wrangler": "^4.47.0" 
   }
 }
+
