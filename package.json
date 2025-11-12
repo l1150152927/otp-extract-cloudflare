@@ -1,0 +1,20 @@
+{
+  "name": "otp-extract-cloudflare",
+  "version": "1.0.0",
+  "description": "Cloudflare Workers 在线 Google OTP 二维码解码工具（与 decodeGoogleOTP 功能一致）",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@zxing/library": "^0.21.0" // 二维码解码库（与 decodeGoogleOTP 的 gozxing 功能对齐）
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250206.0",
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "wrangler": "^3.32.0"
+  }
+}
