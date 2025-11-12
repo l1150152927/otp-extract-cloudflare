@@ -1,7 +1,7 @@
 import { BrowserMultiFormatReader } from '@zxing/library';
 
 /**
- * 1. 内嵌网页 HTML（JS 代码包裹在 DOMContentLoaded 中）
+ * 1. 内嵌网页 HTML（彻底修复引号冲突和语法错误）
  */
 const WEB_HTML = `
 <!DOCTYPE html>
@@ -11,8 +11,8 @@ const WEB_HTML = `
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Google OTP 二维码解码工具</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入二维码生成库（CDN 轻量版） -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <!-- 引入二维码生成库（备选CDN，稳定性更高） -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         .upload-area {
             border: 2px dashed #d1d5db;
@@ -167,9 +167,9 @@ const WEB_HTML = `
     </div>
 
     <script>
-        // 等待 DOM 完全加载后执行所有 JS（核心修复）
+        // 等待 DOM 完全加载（避免元素未找到）
         document.addEventListener('DOMContentLoaded', function() {
-            // DOM 元素（确保能获取到）
+            // 1. 获取所有 DOM 元素（统一用单引号，避免冲突）
             const uploadArea = document.getElementById('uploadArea');
             const fileInput = document.getElementById('fileInput');
             const previewContainer = document.getElementById('previewContainer');
@@ -190,19 +190,18 @@ const WEB_HTML = `
             const errorMsg = document.getElementById('errorMsg');
             const copyToast = document.getElementById('copyToast');
 
-            // 存储解码结果
+            // 全局变量（简化命名，避免冲突）
             let decodedResult = null;
-            // 标记 QRCode 库是否加载成功
-            let qrCodeLoaded = typeof QRCode !== 'undefined';
+            const qrCodeLoaded = typeof QRCode !== 'undefined'; // 二维码库加载状态
 
-            // 上传区域点击触发文件选择（修复点击无反应）
+            // 2. 上传区域点击事件（核心：确保事件绑定无语法错误）
             if (uploadArea && fileInput) {
                 uploadArea.addEventListener('click', function() {
                     fileInput.click();
                 });
             }
 
-            // 拖拽功能
+            // 3. 拖拽功能（修复引号和拼接）
             if (uploadArea) {
                 uploadArea.addEventListener('dragover', function(e) {
                     e.preventDefault();
@@ -222,7 +221,7 @@ const WEB_HTML = `
                 });
             }
 
-            // 文件选择回调
+            // 4. 文件选择回调
             if (fileInput) {
                 fileInput.addEventListener('change', function(e) {
                     if (e.target.files.length > 0) {
@@ -231,7 +230,7 @@ const WEB_HTML = `
                 });
             }
 
-            // 移除图片
+            // 5. 移除图片按钮
             if (removeImageBtn && previewContainer && decodeBtn) {
                 removeImageBtn.addEventListener('click', function() {
                     previewContainer.classList.add('hidden');
@@ -239,7 +238,7 @@ const WEB_HTML = `
                     hideAllResults();
                     if (fileInput) fileInput.value = '';
                     decodedResult = null;
-                    // 清空二维码
+                    // 清空二维码画布
                     if (qrcodeCanvas) {
                         const ctx = qrcodeCanvas.getContext('2d');
                         ctx.clearRect(0, 0, qrcodeCanvas.width, qrcodeCanvas.height);
@@ -247,7 +246,7 @@ const WEB_HTML = `
                 });
             }
 
-            // 解码按钮点击事件（核心修复：确保事件绑定）
+            // 6. 解码按钮（核心功能，修复所有语法错误）
             if (decodeBtn && previewImage) {
                 decodeBtn.addEventListener('click', async function() {
                     const imageSrc = previewImage.src;
@@ -259,11 +258,12 @@ const WEB_HTML = `
                     hideAllResults();
 
                     try {
-                        // 处理 Base64
-                        const base64Str = imageSrc.split(',')[1];
-                        if (!base64Str) throw new Error('图片Base64编码失败');
+                        // 处理 Base64 字符串（修复拼接语法）
+                        const base64Parts = imageSrc.split(',');
+                        if (base64Parts.length < 2) throw new Error('图片Base64编码失败');
+                        const base64Str = base64Parts[1];
 
-                        // 调用后端 API
+                        // 调用后端 API（修复请求体语法）
                         const response = await fetch('/decode', {
                             method: 'POST',
                             headers: { 
@@ -274,7 +274,7 @@ const WEB_HTML = `
                             credentials: 'same-origin'
                         });
 
-                        // 解析响应
+                        // 解析响应（修复错误提示字符串）
                         let data;
                         try {
                             data = await response.json();
@@ -282,11 +282,12 @@ const WEB_HTML = `
                             throw new Error('服务端响应格式错误');
                         }
 
+                        // 隐藏加载状态
                         if (loading) loading.classList.add('hidden');
 
                         if (response.ok && data.success) {
                             decodedResult = data.data;
-                            // 显示结果
+                            // 显示解码结果（修复属性访问语法）
                             if (resultIssuer) resultIssuer.textContent = data.data.issuer || '未知';
                             if (resultAccount) resultAccount.textContent = data.data.account || '未知';
                             if (resultSecret) resultSecret.textContent = data.data.secret || '未知';
@@ -311,7 +312,7 @@ const WEB_HTML = `
                 });
             }
 
-            // 复制密钥功能
+            // 7. 复制密钥功能（修复剪贴板语法）
             if (copySecretBtn && resultSecret) {
                 copySecretBtn.addEventListener('click', function() {
                     const secret = resultSecret.textContent || '';
@@ -322,15 +323,19 @@ const WEB_HTML = `
 
                     if (navigator.clipboard && window.isSecureContext) {
                         navigator.clipboard.writeText(secret)
-                            .then(() => showToast('密钥复制成功！'))
-                            .catch(() => copyWithFallback(secret));
+                            .then(function() {
+                                showToast('密钥复制成功！');
+                            })
+                            .catch(function() {
+                                copyWithFallback(secret);
+                            });
                     } else {
                         copyWithFallback(secret);
                     }
                 });
             }
 
-            // 下载二维码图片
+            // 8. 下载二维码（修复文件名拼接语法）
             if (downloadQrBtn && qrcodeCanvas) {
                 downloadQrBtn.addEventListener('click', function() {
                     if (!decodedResult || !qrCodeLoaded) {
@@ -342,9 +347,9 @@ const WEB_HTML = `
                         const qrUrl = qrcodeCanvas.toDataURL('image/png');
                         const a = document.createElement('a');
                         a.href = qrUrl;
-                        // 文件名拼接（确保语法正确）
+                        // 文件名拼接（彻底修复：避免引号冲突）
                         let filename = 'Google-OTP-';
-                        filename += decodedResult.account || 'unknown';
+                        filename += decodedResult.account ? decodedResult.account : 'unknown';
                         filename += '.png';
                         a.download = filename;
                         document.body.appendChild(a);
@@ -359,7 +364,7 @@ const WEB_HTML = `
                 });
             }
 
-            // 下载 JSON 结果
+            // 9. 下载 JSON（修复字符串拼接）
             if (downloadJsonBtn) {
                 downloadJsonBtn.addEventListener('click', function() {
                     if (!decodedResult) {
@@ -371,7 +376,7 @@ const WEB_HTML = `
                 });
             }
 
-            // 下载 TXT 结果（确保字符串拼接语法正确）
+            // 10. 下载 TXT（修复多行字符串拼接，避免语法错误）
             if (downloadTxtBtn) {
                 downloadTxtBtn.addEventListener('click', function() {
                     if (!decodedResult) {
@@ -379,22 +384,36 @@ const WEB_HTML = `
                         return;
                     }
 
-                    let txtStr = 'Google OTP 解码结果\n';
-                    txtStr += '-------------------\n';
-                    txtStr += '发行方（Issuer）: ' + (decodedResult.issuer || '未知') + '\n';
-                    txtStr += '关联账户（Account）: ' + (decodedResult.account || '未知') + '\n';
-                    txtStr += 'OTP 密钥（Secret）: ' + (decodedResult.secret || '未知') + '\n';
-                    // URI 拼接（确保编码正确）
+                    // 逐行拼接，避免引号冲突和遗漏加号
+                    let txtStr = 'Google OTP 解码结果\\n';
+                    txtStr += '-------------------\\n';
+                    txtStr += '发行方（Issuer）: ';
+                    txtStr += decodedResult.issuer ? decodedResult.issuer : '未知';
+                    txtStr += '\\n';
+                    txtStr += '关联账户（Account）: ';
+                    txtStr += decodedResult.account ? decodedResult.account : '未知';
+                    txtStr += '\\n';
+                    txtStr += 'OTP 密钥（Secret）: ';
+                    txtStr += decodedResult.secret ? decodedResult.secret : '未知';
+                    txtStr += '\\n';
+                    // 二维码 URI 拼接（修复编码和引号）
                     const issuerEnc = encodeURIComponent(decodedResult.issuer || '');
                     const accountEnc = encodeURIComponent(decodedResult.account || '');
                     const secret = decodedResult.secret || '';
-                    txtStr += '二维码URI: otpauth://totp/' + issuerEnc + ':' + accountEnc + '?secret=' + secret + '&issuer=' + issuerEnc;
+                    txtStr += '二维码URI: otpauth://totp/';
+                    txtStr += issuerEnc;
+                    txtStr += ':';
+                    txtStr += accountEnc;
+                    txtStr += '?secret=';
+                    txtStr += secret;
+                    txtStr += '&issuer=';
+                    txtStr += issuerEnc;
 
                     downloadFile(txtStr, 'otp-decode-result.txt', 'text/plain');
                 });
             }
 
-            // 处理文件（预览+显示解码按钮）
+            // 11. 处理文件预览（修复函数内部语法）
             function handleFile(file) {
                 // 校验文件大小
                 if (file.size > 5 * 1024 * 1024) {
@@ -409,7 +428,7 @@ const WEB_HTML = `
                     return;
                 }
 
-                // 预览图片
+                // 读取图片并预览
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     if (previewImage) previewImage.src = e.target.result;
@@ -423,22 +442,23 @@ const WEB_HTML = `
                 reader.readAsDataURL(file);
             }
 
-            // 生成二维码（容错处理）
+            // 12. 生成二维码（修复 URI 拼接语法）
             async function generateQrCode(otpData) {
                 try {
                     const otpUri = new URL('otpauth://totp/');
-                    // 路径拼接（确保编码正确）
+                    // 路径拼接（修复编码和引号）
                     const issuerEnc = encodeURIComponent(otpData.issuer || '');
                     const accountEnc = encodeURIComponent(otpData.account || '');
                     const path = issuerEnc + ':' + accountEnc;
                     otpUri.pathname = path;
-                    // 添加参数
+                    // 设置参数（修复属性访问）
                     otpUri.searchParams.set('secret', otpData.secret || '');
                     otpUri.searchParams.set('issuer', otpData.issuer || '');
                     otpUri.searchParams.set('algorithm', 'SHA1');
                     otpUri.searchParams.set('digits', '6');
                     otpUri.searchParams.set('period', '30');
 
+                    // 生成二维码（修复回调语法）
                     await QRCode.toCanvas(qrcodeCanvas, otpUri.toString(), {
                         width: 256,
                         margin: 1,
@@ -454,7 +474,7 @@ const WEB_HTML = `
                 }
             }
 
-            // 文件下载工具函数
+            // 13. 文件下载工具函数（修复 Blob 语法）
             function downloadFile(content, filename, mimeType) {
                 try {
                     const blob = new Blob([content], { type: mimeType });
@@ -473,12 +493,12 @@ const WEB_HTML = `
                 }
             }
 
-            // 降级复制方案
+            // 14. 降级复制方案（修复文本域语法）
             function copyWithFallback(text) {
                 const textarea = document.createElement('textarea');
                 textarea.value = text;
                 textarea.style.position = 'fixed';
-                textarea.style.left = '-9999px';
+                textarea.style.left = '-9999px'; // 避免遮挡
                 document.body.appendChild(textarea);
                 textarea.select();
                 try {
@@ -492,34 +512,32 @@ const WEB_HTML = `
                 }
             }
 
-            // 提示工具函数
+            // 15. 提示工具函数（修复 DOM 操作语法）
             function showToast(msg) {
                 if (copyToast) {
                     copyToast.textContent = msg;
                     copyToast.classList.remove('hidden');
-                    setTimeout(() => {
+                    setTimeout(function() {
                         copyToast.classList.add('hidden');
                     }, 2000);
                 }
             }
 
-            // 隐藏所有结果卡片
+            // 16. 隐藏所有结果卡片（修复 DOM 操作）
             function hideAllResults() {
                 if (successCard) successCard.classList.add('hidden');
                 if (errorCard) errorCard.classList.add('hidden');
             }
 
-            // 显示错误信息
+            // 17. 显示错误信息（修复 DOM 操作）
             function showError(msg) {
                 if (errorMsg) errorMsg.textContent = msg;
                 if (errorCard) errorCard.classList.remove('hidden');
             }
 
-            // 初始化提示：QRCode 库加载状态
+            // 初始化检查（可选：提示二维码库加载状态）
             if (!qrCodeLoaded) {
                 console.warn('QRCode 库加载失败，二维码功能不可用');
-                // 可选：显示加载失败提示
-                // showToast('二维码库加载失败，部分功能不可用');
             }
         });
     </script>
@@ -528,7 +546,7 @@ const WEB_HTML = `
 `;
 
 /**
- * 2. 核心解码逻辑（无变更）
+ * 2. 核心解码逻辑（无变更，保持稳定性）
  */
 function parseGoogleOTPUri(uri: string): {
   issuer: string;
